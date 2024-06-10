@@ -24,13 +24,13 @@ const UserSchema = new Schema(
         fullName: {
             type:String,
             required:true,
-            lowercase:trim,
+            lowercase:true,
             trim:true
         },
 
         avatar:{
             type:String,
-            required: false
+            required: true
         },
 
         coverImage: {
@@ -43,6 +43,9 @@ const UserSchema = new Schema(
             required:[true,"Password is requried"]
         },
 
+        refreshToken:{
+            type:String
+        },
         watchHistory: [
             {
                 type: Schema.Types.ObjectId,
@@ -62,7 +65,7 @@ UserSchema.pre("save", async function() {
     if(!this.isModified("password")) return next();
 
     this.password = await bcrypt.hash(this.password,10);
-    next();
+    // next();
 })
 
 UserSchema.methods.isPasswordCorrect = async function(password){

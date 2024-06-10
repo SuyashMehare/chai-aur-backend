@@ -13,7 +13,6 @@ import cors  from "cors";
 import cookieParser from "cookie-parser";
 
 const app = express();
-const router = express.Router()
 
 
 app.use(cors({
@@ -27,23 +26,18 @@ app.use(express.static("public"))
 app.use(cookieParser())
 
 
-router.get('/',(req,res,nxt) => {
-    console.log('middleware');
-    nxt()
-})
+// import routers
+import userRouter from "./routers/user.router.js";
 
-router.get('/home',(req,res,nxt) => {
-    console.log('middleware 2');
-    nxt()
-})
+//
+app.use("/api/v1/users",userRouter);
 
-
-// app.use(router)
 
 app.use((err,req,res,next)=>{
 
-    console.log('error');
-    res.status(err.statusCode).json({
+    
+    console.log('error',err);
+    res.status(err.statusCode || 500).json({
         status : err.statusCode,
         message : err.message
     })

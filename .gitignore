@@ -147,3 +147,9 @@ dist
 # ------
 /Notes
 /todo
+/test.java
+/cloudinaryPractise
+/src/app2.js
+/src/controllers/comment.controller.js
+/src/models/comment.model.js
+/src/routers/comment.router.js
