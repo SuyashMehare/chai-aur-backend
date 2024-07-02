@@ -4,14 +4,21 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 
-const generateAccessNdRefreshToken = () => {
+const generateAccessNdRefreshToken = async(userid) => {
     
+    const user = await User.findById(userid)
+
     try {
-        let accessToken = User.generateAccessToken()
-        let refreshToken = User.generateRefreshToken();
+        let accessToken =  user.generateAccessToken()
+        let refreshToken = user.generateRefreshToken();
+        
+        user.refreshToken = refreshToken
+        await user.save({ validateBeforeSave: false }) //Edge Case: docemntNotFoundError
+   
 
         return {accessToken,refreshToken}
     } catch (error) {
+
         throw new ApiError(500,"Sowething went wrong in generating refersh & accesss tokens")
     }
 }
@@ -71,39 +78,37 @@ const registerUser = asyncHandler(async(req,res) => {
 
     return res.status(201).json(new ApiResponse(200,createdUser,"User is registered"))
 })
-    
+
 
 const loginUser = asyncHandler(async(req,res) => {
 
-    const{username, email, password} = req.body;
+    const{userName, email, password} = req.body;
 
     const userExist = await User.findOne({
-        $or: [{username},{email}]
+        $or: [{userName},{email}]
     })
 
-    if(userExist){
+    if(!userExist){
         throw new ApiError(401,"User doesn't exist")
     }
 
-    const isPassCorrect = await User.isPasswordCorrect(userExist.password)
+    const isPassCorrect = await userExist.isPasswordCorrect(password)
 
     if(!isPassCorrect) {
         throw new ApiError(401,"Password is incorrect")
     }
 
-    const{accessToken,refreshToken} = await generateAccessNdRefreshToken();
+    const{accessToken,refreshToken} = await generateAccessNdRefreshToken(userExist._id);
 
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false }) //Edge Case: docemntNotFoundError
 
+    const loggedInUser  = await User.findById(userExist._id).select("-password -refreshToken")
 
     const options = {
         httpOnly:true,
         secure:true
     }
 
-    return 
-    res
+    return res
     .status(200)
     .cookie("accessToken",accessToken,options)
     .cookie("refreshToken",refreshToken,options)
@@ -111,25 +116,35 @@ const loginUser = asyncHandler(async(req,res) => {
         new ApiResponse(200,
             {
                 user:loggedInUser, accessToken, refreshToken
-            }
-        ),
-        "User logged In Successfully"
+            },
+            "User logged In Successfully"
+        )
     )
  })    
 
 
 const logoutUser = asyncHandler(async(req,res) => {
     
-    /** cookies: access token
-     * 1. fetch {access,refresh} token from cookie
-     * 2. CHECK: {access,refresh} token is valid or not
-     * 3. FETCH: fetch refresh token user from db
-     * 4. REMOVE: refresh token from user object
-     * 5. *EXPIRE: {access,refresh} token
-     * 6. *RETURN: cookie with {access:null, refresh:null} token
-     */
 
+    // cookies clear, accesstoken expire/blacklist,  
 
+    // Q. what if another person with accesstoken/refreshtoken should we blacklist\
+    // or their is way to forcefully expure them
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {$set:{refreshToken : undefined}},
+        {new:true}
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .clearCookie("accessToken",options)
+    .clearCookie("refreshToken",options)
+    .json(new ApiResponse(200,{},"User logged out"))
 })
 
 
@@ -138,5 +153,7 @@ const logoutUser = asyncHandler(async(req,res) => {
 
 export {
     
-    registerUser
+    registerUser,
+    loginUser,
+    logoutUser
 }
